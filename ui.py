@@ -21,6 +21,11 @@ class PROJECTOR_OT_view_camera(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
+        # Utilise le premier projecteur pour la vue caméra
+        projectors = get_projectors(context, only_selected=True)
+        if projectors:
+            # Sélectionner temporairement le premier projecteur pour la vue caméra
+            bpy.context.scene.camera = projectors[0]
         bpy.ops.view3d.view_camera()
         return {'FINISHED'}
 
@@ -49,18 +54,39 @@ class PROJECTOR_OT_toggle_screen(Operator):
         return None
 
     def execute(self, context):
-        parent_obj = context.active_object
-        screen_obj = self.find_screen_object(parent_obj)
+        # Agir sur tous les objets parents des projecteurs sélectionnés
+        projectors = get_projectors(context, only_selected=True)
+        if not projectors:
+            self.report({'WARNING'}, "No projectors found")
+            return {'FINISHED'}
         
-        if screen_obj:
-            # Toggle "Show in viewports" uniquement
-            current_state = screen_obj.hide_get()
-            screen_obj.hide_set(not current_state)
-            
-            status = "OFF" if screen_obj.hide_get() else "ON"
-            self.report({'INFO'}, f"Screen {status}: {screen_obj.name}")
+        # Obtenir tous les objets parents
+        parent_objects = []
+        for obj in context.selected_objects:
+            # Chercher l'objet parent qui a déclenché la détection du projecteur
+            projector_child = None
+            for projector in projectors:
+                if projector.parent == obj or obj == projector:
+                    parent_objects.append(obj)
+                    break
+        
+        # Si pas de parents trouvés, utiliser les objets sélectionnés
+        if not parent_objects:
+            parent_objects = context.selected_objects
+        
+        screens_toggled = 0
+        for parent_obj in parent_objects:
+            screen_obj = self.find_screen_object(parent_obj)
+            if screen_obj:
+                # Toggle "Show in viewports" 
+                current_state = screen_obj.hide_get()
+                screen_obj.hide_set(not current_state)
+                screens_toggled += 1
+        
+        if screens_toggled > 0:
+            self.report({'INFO'}, f"Toggled {screens_toggled} screen(s)")
         else:
-            self.report({'WARNING'}, "No screen object found (name should contain 'écran' or 'ecran' or 'screen')")
+            self.report({'WARNING'}, "No screen objects found")
         
         return {'FINISHED'}
 
@@ -85,75 +111,100 @@ class PROJECTOR_OT_toggle_light(Operator):
     def execute(self, context):
         projectors = get_projectors(context, only_selected=True)
         if not projectors:
-            self.report({'WARNING'}, "No projector found")
+            self.report({'WARNING'}, "No projectors found")
             return {'FINISHED'}
         
-        projector = projectors[0]
-        light_obj = self.find_light_object(projector)
+        lights_toggled = 0
+        for projector in projectors:
+            light_obj = self.find_light_object(projector)
+            if light_obj:
+                # Toggle visibility in viewport ET disable in renders
+                current_viewport = light_obj.hide_viewport
+                
+                # Synchroniser les deux (ON = visible partout, OFF = caché partout)
+                new_state = not current_viewport
+                light_obj.hide_viewport = new_state
+                light_obj.hide_render = new_state
+                lights_toggled += 1
         
-        if light_obj:
-            # Toggle visibility in viewport ET disable in renders
-            current_viewport = light_obj.hide_viewport
-            current_render = light_obj.hide_render
-            
-            # Synchroniser les deux (ON = visible partout, OFF = caché partout)
-            new_state = not current_viewport
-            light_obj.hide_viewport = new_state
-            light_obj.hide_render = new_state
-            
-            status = "OFF" if new_state else "ON"
-            self.report({'INFO'}, f"Light {status}: {light_obj.name}")
+        if lights_toggled > 0:
+            self.report({'INFO'}, f"Toggled {lights_toggled} light(s)")
         else:
-            self.report({'WARNING'}, "No light object found in projector children")
+            self.report({'WARNING'}, "No lights found")
         
         return {'FINISHED'}
 
+
 def get_screen_button_text(context):
-    """Retourne le texte du bouton selon l'état de l'écran"""
+    """Retourne le texte du bouton selon l'état des écrans"""
+    projectors = get_projectors(context, only_selected=True)
+    if not projectors:
+        return "Screen"
     
     def find_screen_recursive(obj):
-        """Recherche récursive d'un objet écran"""
         if not obj:
             return None
-        
-        # Vérifier l'objet actuel
         name_lower = obj.name.lower()
         if 'écran' in name_lower or 'screen' in name_lower:
             return obj
-        
-        # Recherche dans tous les enfants
         for child in obj.children:
             result = find_screen_recursive(child)
             if result:
                 return result
-        
         return None
     
-    parent_obj = context.active_object
-    screen_obj = find_screen_recursive(parent_obj)
+    # Compter les états des écrans
+    screen_on = 0
+    screen_off = 0
     
-    if screen_obj:
-        return "Screen OFF" if screen_obj.hide_get() else "Screen ON"
+    for obj in context.selected_objects:
+        screen_obj = find_screen_recursive(obj)
+        if screen_obj:
+            if screen_obj.hide_get():
+                screen_off += 1
+            else:
+                screen_on += 1
+    
+    if screen_on > 0 and screen_off > 0:
+        return "Screen Mixed"
+    elif screen_off > 0:
+        return "Screen OFF"
+    elif screen_on > 0:
+        return "Screen ON"
     else:
         return "Screen"
 
 def get_light_button_text(context):
-    """Retourne le texte du bouton selon l'état de la lumière"""
+    """Retourne le texte du bouton selon l'état des lumières"""
     projectors = get_projectors(context, only_selected=True)
     if not projectors:
         return "Light"
     
-    projector = projectors[0]
+    # Compter les états des lumières
+    light_on = 0
+    light_off = 0
     
-    # Trouver la lumière enfant
-    for child in projector.children:
-        if child.type == 'LIGHT':
-            return "Light OFF" if child.hide_viewport else "Light ON"
+    for projector in projectors:
+        for child in projector.children:
+            if child.type == 'LIGHT':
+                if child.hide_viewport:
+                    light_off += 1
+                else:
+                    light_on += 1
+                break
     
-    return "Light"
+    if light_on > 0 and light_off > 0:
+        return "Light Mixed"
+    elif light_off > 0:
+        return "Light OFF"
+    elif light_on > 0:
+        return "Light ON"
+    else:
+        return "Light"
+
 class PROJECTOR_PT_projector_settings(Panel):
     bl_idname = 'OBJECT_PT_projector_n_panel'
-    bl_label = 'Proj By Lotchi'
+    bl_label = 'Proj By Lotchi 25.1.2'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "Proj By Lotchi"
@@ -175,17 +226,18 @@ class PROJECTOR_PT_projector_settings(Panel):
             box.operator('projector.switch_to_cycles')
 
         selected_projectors = get_projectors(context, only_selected=True)
-        if len(selected_projectors) == 1:
-            projector = selected_projectors[0]
-            proj_settings = projector.proj_settings
-            parent_obj = context.active_object
-
+        if len(selected_projectors) >= 1:  # ← CHANGEMENT : >= au lieu de ==
+            
             layout.separator()
             
-            # Afficher le nom de la caméra projecteur en cours de gestion
+            # Affichage du nombre de projecteurs sélectionnés
             info_box = layout.box()
             info_row = info_box.row()
-            info_row.label(text=f"Editing: {projector.name}", icon='OUTLINER_OB_CAMERA')
+            if len(selected_projectors) == 1:
+                info_row.label(text=f"Editing: {selected_projectors[0].name}", icon='OUTLINER_OB_CAMERA')
+            else:
+                info_row.label(text=f"Editing: {len(selected_projectors)} projectors", icon='OUTLINER_OB_CAMERA')
+            
             # Boutons Focus, POV, Screen et Light en dessous, côte à côte
             buttons_row = info_box.row(align=True)
             buttons_row.operator('projector.focus_selected', text="Focus", icon='ZOOM_SELECTED')
@@ -195,53 +247,67 @@ class PROJECTOR_PT_projector_settings(Panel):
             light_btn_text = get_light_button_text(context)
             buttons_row.operator('projector.toggle_light', text=light_btn_text, icon='LIGHT')
 
-            layout.label(text='Projector Settings:')
-            box = layout.box()
-            box.prop(proj_settings, 'throw_ratio')
-            box.prop(proj_settings, 'power', text='Power')
-            res_row = box.row()
-            res_row.prop(proj_settings, 'resolution',
-                         text='Resolution', icon='PRESET')
-            if proj_settings.projected_texture == Textures.CUSTOM_TEXTURE.value and proj_settings.use_custom_texture_res:
-                res_row.active = False
-                res_row.enabled = False
-            else:
-                res_row.active = True
-                res_row.enabled = True
+            # === PROPRIÉTÉS - SEULEMENT SI UN SEUL PROJECTEUR ===
+            if len(selected_projectors) == 1:
+                projector = selected_projectors[0]
+                proj_settings = projector.proj_settings
+                parent_obj = context.active_object
 
-            # Vérification et affichage des custom properties
-            if parent_obj and ("SCREEN_DISTANCE" in parent_obj or "VP_PAN" in parent_obj or "VP_TILT" in parent_obj or "VP_DOUBLE_PAN" in parent_obj):
-                
-                # Screen Distance
-                if "SCREEN_DISTANCE" in parent_obj:
-                    box.prop(parent_obj, '["SCREEN_DISTANCE"]', text='Screen Distance')
-                
-                # VP Pan & Tilt
-                col = box.column(align=True)
-                if "VP_PAN" in parent_obj:
-                    col.prop(parent_obj, '["VP_PAN"]', text='Pan')
-                if "VP_TILT" in parent_obj:
-                    col.prop(parent_obj, '["VP_TILT"]', text='Tilt')
-                if "VP_DOUBLE_PAN" in parent_obj:
-                    col.prop(parent_obj, '["VP_DOUBLE_PAN"]', text='DPan')
-            
-            # Lens Shift
-            col = box.column(align=True)
-            col.prop(proj_settings,
-                     'h_shift', text='Horizontal Shift')
-            col.prop(proj_settings, 'v_shift', text='Vertical Shift')
-            layout.prop(proj_settings,
-                        'projected_texture', text='Project')
-            # Pixel Grid
-            box.prop(proj_settings, 'show_pixel_grid')
-
-            # Custom Texture
-            if proj_settings.projected_texture == Textures.CUSTOM_TEXTURE.value:
+                layout.label(text='Projector Settings:')
                 box = layout.box()
-                box.prop(proj_settings, 'use_custom_texture_res')
-                node = get_projectors(context, only_selected=True)[
-                    0].children[0].data.node_tree.nodes['Image Texture']
-                box.template_image(node, 'image', node.image_user, compact=False)
+                box.prop(proj_settings, 'throw_ratio')
+                box.prop(proj_settings, 'power', text='Power')
+                res_row = box.row()
+                res_row.prop(proj_settings, 'resolution',
+                             text='Resolution', icon='PRESET')
+                if proj_settings.projected_texture == Textures.CUSTOM_TEXTURE.value and proj_settings.use_custom_texture_res:
+                    res_row.active = False
+                    res_row.enabled = False
+                else:
+                    res_row.active = True
+                    res_row.enabled = True
+
+                # Vérification et affichage des custom properties
+                if parent_obj and ("SCREEN_DISTANCE" in parent_obj or "VP_PAN" in parent_obj or "VP_TILT" in parent_obj or "VP_DOUBLE_PAN" in parent_obj):
+                    
+                    # Screen Distance
+                    if "SCREEN_DISTANCE" in parent_obj:
+                        box.prop(parent_obj, '["SCREEN_DISTANCE"]', text='Screen Distance')
+                    
+                    # VP Pan & Tilt
+                    col = box.column(align=True)
+                    if "VP_PAN" in parent_obj:
+                        col.prop(parent_obj, '["VP_PAN"]', text='Pan')
+                    if "VP_TILT" in parent_obj:
+                        col.prop(parent_obj, '["VP_TILT"]', text='Tilt')
+                    if "VP_DOUBLE_PAN" in parent_obj:
+                        col.prop(parent_obj, '["VP_DOUBLE_PAN"]', text='DPan')
+                
+                # Lens Shift
+                col = box.column(align=True)
+                col.prop(proj_settings,
+                         'h_shift', text='Horizontal Shift')
+                col.prop(proj_settings, 'v_shift', text='Vertical Shift')
+                layout.prop(proj_settings,
+                            'projected_texture', text='Project')
+                # Pixel Grid
+                box.prop(proj_settings, 'show_pixel_grid')
+
+                # Custom Texture
+                if proj_settings.projected_texture == Textures.CUSTOM_TEXTURE.value:
+                    box = layout.box()
+                    box.prop(proj_settings, 'use_custom_texture_res')
+                    node = get_projectors(context, only_selected=True)[
+                        0].children[0].data.node_tree.nodes['Image Texture']
+                    box.template_image(node, 'image', node.image_user, compact=False)
+            
+            # === MESSAGE POUR SÉLECTION MULTIPLE ===
+            else:
+                layout.separator()
+                msg_box = layout.box()
+                msg_box.label(text=f"{len(selected_projectors)} projectors selected", icon='INFO')
+                msg_box.label(text="• Buttons affect all projectors")
+                msg_box.label(text="• Select one projector to edit properties")
 
 class PROJECTOR_PT_projected_color(Panel):
     bl_label = "Projected Color"
@@ -252,12 +318,15 @@ class PROJECTOR_PT_projected_color(Panel):
 
     @classmethod
     def poll(self, context):
-        """ Only show if projected texture is set to  'checker'."""
-        projector = context.object
-        return bool(get_projectors(context, only_selected=True)) and projector.proj_settings.projected_texture == Textures.CHECKER.value
+        """ Only show if projected texture is set to  'checker' AND only one projector selected."""
+        selected_projectors = get_projectors(context, only_selected=True)
+        if len(selected_projectors) != 1:  # Seulement pour un projecteur
+            return False
+        projector = selected_projectors[0]
+        return projector.proj_settings.projected_texture == Textures.CHECKER.value
 
     def draw(self, context):
-        projector = context.object
+        projector = get_projectors(context, only_selected=True)[0]
         layout = self.layout
         layout.use_property_decorate = False
         col = layout.column()
