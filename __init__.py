@@ -3,15 +3,15 @@ from . import projector
 from . import operators
 
 bl_info = {
-    "name": "Projector",
-    "author": "Jonas Schell",
+    "name": "Projector by Lotchi",
+    "author": "Baptiste Jazé",
     "description": "Easy Projector creation and modification.",
-    "blender": (2, 81, 0),
-    "version": (2024, 1, 1),
+    "blender": (4, 5, 0),
+    "version": (2025, 29, 5),
     "location": "3D Viewport > Add > Light > Projector",
     "category": "Lighting",
-    "wiki_url": "https://github.com/Ocupe/Projectors/wiki",
-    "tracker_url": "https://github.com/Ocupe/Projectors/issues"
+    "wiki_url": "",
+    "tracker_url": ""
 }
 
 

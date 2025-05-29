@@ -523,12 +523,12 @@ def create_projector(context):
 def init_projector(proj_settings, context):
     # # Add custom properties to store projector settings on the camera obj.
     proj_settings.throw_ratio = 0.8
-    proj_settings.power = 1000.0
+    proj_settings.power = 18500.0
     proj_settings.projected_texture = Textures.CHECKER.value
     proj_settings.h_shift = 0.0
     proj_settings.v_shift = 0.0
     proj_settings.projected_color = random_color()
-    proj_settings.resolution = '1920x1080'
+    proj_settings.resolution = '1920x1200'
     proj_settings.use_custom_texture_res = True
 
     # Init Projector
@@ -611,12 +611,13 @@ class ProjectorSettings(bpy.types.PropertyGroup):
         subtype='FACTOR')
     power: bpy.props.FloatProperty(
         name="Projector Power",
+        default=18500.0,
         soft_min=0, soft_max=999999,
         update=update_power,
         unit='POWER')
     resolution: bpy.props.EnumProperty(
         items=RESOLUTIONS,
-        default='1920x1080',
+        default='1920x1200',
         description="Select a Resolution for your Projector",
         update=update_resolution)
     use_custom_texture_res: bpy.props.BoolProperty(
@@ -627,13 +628,13 @@ class ProjectorSettings(bpy.types.PropertyGroup):
     h_shift: bpy.props.FloatProperty(
         name="Horizontal Shift",
         description="Horizontal Lens Shift",
-        soft_min=-20, soft_max=20,
+        soft_min=-50, soft_max=50,
         update=update_lens_shift,
         subtype='PERCENTAGE')
     v_shift: bpy.props.FloatProperty(
         name="Vertical Shift",
         description="Vertical Lens Shift",
-        soft_min=-20, soft_max=20,
+        soft_min=-50, soft_max=50,
         update=update_lens_shift,
         subtype='PERCENTAGE')
     projected_color: bpy.props.FloatVectorProperty(
