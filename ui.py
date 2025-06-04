@@ -304,9 +304,9 @@ class PROJECTOR_OT_export_csv(Operator):
             return {'FINISHED'}
         
         # CSV headers (normalized in English)
-        headers = ['vp_name', 'brand', 'model', 'resolution', 'lumens', 'lens', 
-                   'orientation', 'throw_ratio', 'pan', 'tilt', 'dpan', 'shift_h', 'shift_v', 
-                   'pixel_size', 'lux', 'screen_distance', 'image_width', 'image_height']
+        headers = ['vp_name', 'brand', 'model', 'lens', 'resolution', 'lumens', 
+           'orientation', 'throw_ratio', 'pan', 'tilt', 'dpan', 'shift_h', 'shift_v', 
+           'pixel_size', 'lux', 'screen_distance', 'image_width', 'image_height']
         
         rows = []
         
@@ -318,12 +318,27 @@ class PROJECTOR_OT_export_csv(Operator):
             if not parent_obj:
                 parent_obj = projector
             
-            # Basic info
+            # Basic info avec récupération depuis custom properties
             vp_name = projector.name
-            brand = parent_obj.get("BRAND", "")  # Custom property if exists
-            model = parent_obj.get("MODEL", "")  # Custom property if exists
+
+            # Essayer de récupérer depuis les custom properties d'abord
+            brand = projector.get("SELECTED_BRAND", "")
+            model = projector.get("SELECTED_MODEL", "")
+            lens = projector.get("SELECTED_LENS", "")
+
+            # Fallback vers les enum si custom properties pas disponibles
+            if not brand:
+                try:
+                    brand_val = proj_settings.projector_brand
+                    if brand_val and brand_val != 'NONE':
+                        brand = brand_val
+                except:
+                    pass
+
             resolution = proj_settings.resolution
-            lens = parent_obj.get("LENS", "")  # Custom property if exists
+
+            print(f"DEBUG CSV - {vp_name}: Brand='{brand}', Model='{model}', Lens='{lens}'")
+            
             orientation = proj_settings.orientation
             throw_ratio = proj_settings.throw_ratio
             
@@ -366,7 +381,7 @@ class PROJECTOR_OT_export_csv(Operator):
             
             # Create row
             # Create row avec formatage des valeurs numériques
-            row = [vp_name, brand, model, resolution, f"{lumens_value:.0f}", lens, orientation, 
+            row = [vp_name, brand, model, lens, resolution, f"{lumens_value:.0f}", orientation, 
                 f"{throw_ratio:.2f}", f"{math.degrees(pan):.0f}", f"{math.degrees(tilt):.0f}", f"{math.degrees(dpan):.0f}",
                 f"{shift_h:.2f}", f"{shift_v:.2f}", f"{float(pixel_size):.2f}" if pixel_size else "", lux,
                 f"{screen_distance:.2f}", f"{float(image_width):.2f}" if image_width else "", f"{float(image_height):.2f}" if image_height else ""]
@@ -507,13 +522,14 @@ class PROJECTOR_PT_projector_settings(Panel):
                 box.prop(proj_settings, 'orientation', text='Orientation')
                 # Base de données projecteurs
                 db_col = box.column(align=True)
+
                 db_col.prop(proj_settings, 'projector_brand', text='Brand')
                 db_col.prop(proj_settings, 'projector_model', text='Model') 
                 db_col.prop(proj_settings, 'projector_lens', text='Lens')
-                box.separator()
-                box.prop(proj_settings, 'throw_ratio')
                 box.prop(proj_settings, 'power', text='Power')
-                box.prop(proj_settings, 'lumens', text='Lumens')
+                #box.prop(proj_settings, 'lumens', text='Lumens')
+                box.prop(proj_settings, 'throw_ratio')
+                
                 res_row = box.row()
                 res_row.prop(proj_settings, 'resolution',
                              text='Resolution', icon='PRESET')
@@ -581,7 +597,8 @@ class PROJECTOR_PT_projector_settings(Panel):
                         info_col.scale_y = 0.8  # Facteur de réduction de l'espacement vertical
                         
                         info_col.label(text=f"Distance: {parent_obj['SCREEN_DISTANCE']:.1f}m, TR: {proj_settings.throw_ratio:.2f}", icon='INFO')
-                        
+                        info_col.label(text=f"Lumens: {proj_settings.lumens:.0f} ANSI", icon='LIGHT_AREA')
+
                         # Calcul du ratio d'image
                         res_w, res_h = proj_settings.resolution.split('x')
                         image_ratio = float(res_w) / float(res_h)

@@ -12,7 +12,7 @@ Ce document liste toutes les fonctionnalités prévues pour les futures versions
 - [x] Option Paysage Dual disponible, si coché double ligne dans CSV, et visibilité d'un objet dont le nom contient "dual"
 - [x] Export CSV des données
 - [x] Offset automatique de l'écran avec shift caméra
-- [ ] Base de données de projecteurs
+- [x] Base de données de projecteurs
 - [ ] Fonction Mirror XZ, si c'est Portrait tel Mirror, si c'est Paysage tel Mirror
 - [ ] Bouton Dupliquer Mirror Renommer Delete
 

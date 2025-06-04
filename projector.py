@@ -136,6 +136,12 @@ def update_projector_model_local(proj_settings, context):
         proj_settings.lumens = new_lumens
         print(f"LOCAL DEBUG: Lumens set to {new_lumens}")
         
+        # Sauvegarder dans custom properties
+        projector = get_projector(bpy.context)
+        if projector:
+            projector["SELECTED_BRAND"] = brand
+            projector["SELECTED_MODEL"] = model
+        
         # Force UI refresh
         bpy.context.area.tag_redraw() if bpy.context.area else None
 
@@ -155,9 +161,16 @@ def update_projector_lens_local(proj_settings, context):
         
         lens_data = PROJECTOR_DATABASE[brand][model][lens]
         
-        # Mettre à jour SEULEMENT les lumens (pas les shift ranges qui n'existent pas)
+        # Mettre à jour SEULEMENT les lumens
         proj_settings.lumens = lens_data['ansi_lumens']
         print(f"LOCAL DEBUG LENS: Lumens set to {lens_data['ansi_lumens']}")
+        
+        # Sauvegarder dans custom properties
+        projector = get_projector(bpy.context)
+        if projector:
+            projector["SELECTED_BRAND"] = brand
+            projector["SELECTED_MODEL"] = model  
+            projector["SELECTED_LENS"] = lens
         
         # Force UI refresh
         bpy.context.area.tag_redraw() if bpy.context.area else None

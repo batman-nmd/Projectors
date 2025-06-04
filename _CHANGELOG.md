@@ -5,7 +5,7 @@ Toutes les modifications importantes de ce projet seront documentées dans ce fi
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Versioning Sémantique](https://semver.org/lang/fr/).
 
-## [2025.1.7] - 2025-06-04
+## [2025.1.8] - 2025-06-04
 
 ### Ajouté
 - **Sélection par objet parent** : Plus besoin de sélectionner directement la caméra projecteur
