@@ -412,9 +412,10 @@ def update_throw_ratio(proj_settings, context):
 
     
 
+
 def update_lens_shift(proj_settings, context):
     """
-    Apply the shift to the camera, texture, and screen position.
+    Apply the shift to the camera and texture.
     """
     projector = get_projector(context)
     h_shift = proj_settings.get('h_shift', 0.0) / 100
@@ -439,52 +440,6 @@ def update_lens_shift(proj_settings, context):
         nodes['Mapping.001'].inputs[1].default_value[0] = h_shift / throw_ratio
         nodes['Mapping.001'].inputs[1].default_value[1] = v_shift / throw_ratio * inverted_aspect_ratio
 
-    # ===== NOUVEAU : Déplacer l'écran automatiquement =====
-    
-    # Chercher l'objet parent qui pourrait contenir l'écran
-    parent_obj = context.active_object if context.active_object != projector else projector.parent
-    if not parent_obj:
-        parent_obj = projector
-    
-    # Trouver l'objet écran
-    screen_obj = find_screen_object_recursive(parent_obj)
-    if not screen_obj:
-        screen_obj = find_screen_object_recursive(projector)
-    
-    if screen_obj:
-        # Obtenir la distance à l'écran
-        screen_distance = None
-        if "SCREEN_DISTANCE" in parent_obj:
-            screen_distance = parent_obj["SCREEN_DISTANCE"]
-        elif "SCREEN_DISTANCE" in projector:
-            screen_distance = projector["SCREEN_DISTANCE"]
-        
-        if screen_distance:
-            # Calculer le déplacement physique de l'écran basé sur le lens shift
-            try:
-                screen_width, screen_height = calculate_screen_size(throw_ratio, screen_distance, proj_settings.resolution)
-                
-                # Le déplacement de l'écran est proportionnel au shift
-                screen_offset_x = h_shift * screen_width
-                screen_offset_z = v_shift * screen_height  # Z car c'est la hauteur dans Blender
-                
-                # Appliquer le déplacement à l'écran
-                if not hasattr(screen_obj, '_original_location'):
-                    # Sauvegarder la position originale la première fois
-                    screen_obj['_original_location'] = list(screen_obj.location)
-                    original_loc = screen_obj.location.copy()
-                else:
-                    # Récupérer la position originale sauvegardée
-                    original_loc = screen_obj['_original_location']
-                
-                # Appliquer le nouvel offset à partir de la position originale
-                screen_obj.location[0] = original_loc[0] + screen_offset_x  # X = largeur
-                screen_obj.location[2] = original_loc[2] + screen_offset_z  # Z = hauteur
-                
-                log.debug(f"Screen offset applied: X={screen_offset_x:.3f}m, Z={screen_offset_z:.3f}m")
-                
-            except Exception as e:
-                log.warning(f"Could not calculate screen offset: {e}")
 
 def update_resolution(proj_settings, context):
     projector = get_projector(context)
@@ -816,7 +771,7 @@ def register():
 
 
 def unregister():
-    bpy.utils.unregister_class(PROJECTOR_OT_auto_adjust_screen_size)
+    
     bpy.utils.unregister_class(PROJECTOR_OT_change_color_randomly)
     bpy.utils.unregister_class(PROJECTOR_OT_delete_projector)
     bpy.utils.unregister_class(PROJECTOR_OT_create_projector)

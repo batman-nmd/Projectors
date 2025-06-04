@@ -24,7 +24,6 @@ et ce projet adhère au [Versioning Sémantique](https://semver.org/lang/fr/).
 - **Recherche récursive avancée** pour les objets écran dans toute la hiérarchie
 - **Synchronisation complète** des systèmes de visibilité (viewport + render pour la lumière)
 - **Résolutions VP** il manquait 3840x2400 en 16:10
-- **Taille** Ajustement automatique taille écran quand on touche à distance écran et throw ratio
 
 ### Modifié
 - **Nom de l'onglet** : "Projector" → "Proj By Lotchi"
