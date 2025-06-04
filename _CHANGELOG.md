@@ -5,7 +5,7 @@ Toutes les modifications importantes de ce projet seront documentées dans ce fi
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Versioning Sémantique](https://semver.org/lang/fr/).
 
-## [2025.1.5] - 2025-06-04
+## [2025.1.7] - 2025-06-04
 
 ### Ajouté
 - **Sélection par objet parent** : Plus besoin de sélectionner directement la caméra projecteur
@@ -24,6 +24,14 @@ et ce projet adhère au [Versioning Sémantique](https://semver.org/lang/fr/).
 - **Recherche récursive avancée** pour les objets écran dans toute la hiérarchie
 - **Synchronisation complète** des systèmes de visibilité (viewport + render pour la lumière)
 - **Résolutions VP** il manquait 3840x2400 en 16:10
+- [x] Sélection multiple d'objets 
+- [x] Calculs techniques (Lux + taille pixel)
+- [x] Ajustement automatique taille écran
+- [x] Définir si c'est Portrait ou paysage 
+- [x] Option Paysage Dual disponible, si coché double ligne dans CSV, et visibilité d'un objet dont le nom contient "dual"
+- [x] Export CSV des données
+- [x] Offset automatique de l'écran avec shift caméra
+
 
 ### Modifié
 - **Nom de l'onglet** : "Projector" → "Proj By Lotchi"

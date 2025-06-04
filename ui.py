@@ -1,7 +1,7 @@
 from .helper import get_projectors
 from .projector import RESOLUTIONS, Textures, calculate_screen_size, calculate_lux, calculate_pixel_size
 
-import bpy
+import bpy, math
 from bpy.types import Panel, PropertyGroup, UIList, Operator
 
 class PROJECTOR_OT_focus_selected(Operator):
@@ -238,6 +238,47 @@ class PROJECTOR_OT_set_color(Operator):
         
         return {'FINISHED'}
 
+class PROJECTOR_OT_reset_values(Operator):
+    """Reset angles and shifts to zero"""
+    bl_idname = 'projector.reset_values'
+    bl_label = 'Reset Values'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        selected_projectors = get_projectors(context, only_selected=True)
+        return len(selected_projectors) >= 1
+
+    def execute(self, context):
+        selected_projectors = get_projectors(context, only_selected=True)
+        reset_count = 0
+        
+        for projector in selected_projectors:
+            proj_settings = projector.proj_settings
+            parent_obj = context.active_object if context.active_object != projector else projector.parent
+            if not parent_obj:
+                parent_obj = projector
+            
+            # Reset shifts
+            proj_settings.h_shift = 0.0
+            proj_settings.v_shift = 0.0
+            
+            # Reset angles if they exist
+            if "VP_PAN" in parent_obj:
+                parent_obj["VP_PAN"] = 0.0
+            if "VP_TILT" in parent_obj:
+                parent_obj["VP_TILT"] = 0.0
+            if "VP_DOUBLE_PAN" in parent_obj:
+                parent_obj["VP_DOUBLE_PAN"] = 0.0
+            
+            # Forcer la mise à jour
+            parent_obj.update_tag()
+            bpy.context.view_layer.update()
+                
+            reset_count += 1
+        
+        self.report({'INFO'}, f"Reset values for {reset_count} projector(s)")
+        return {'FINISHED'}
 class PROJECTOR_OT_export_csv(Operator):
     """Export projector data to CSV"""
     bl_idname = 'projector.export_csv'
@@ -263,11 +304,9 @@ class PROJECTOR_OT_export_csv(Operator):
             return {'FINISHED'}
         
         # CSV headers (normalized in English)
-        headers = [
-            'vp_name', 'brand', 'model', 'resolution', 'lens', 'orientation', 
-            'throw_ratio', 'pan', 'tilt', 'dpan', 'shift_h', 'shift_v', 
-            'pixel_size', 'lux', 'screen_distance', 'image_width', 'image_height'
-        ]
+        headers = ['vp_name', 'brand', 'model', 'resolution', 'lumens', 'lens', 
+                   'orientation', 'throw_ratio', 'pan', 'tilt', 'dpan', 'shift_h', 'shift_v', 
+                   'pixel_size', 'lux', 'screen_distance', 'image_width', 'image_height']
         
         rows = []
         
@@ -299,6 +338,7 @@ class PROJECTOR_OT_export_csv(Operator):
             
             # Screen distance
             screen_distance = parent_obj.get("SCREEN_DISTANCE", 0)
+            lumens_value = proj_settings.lumens
             
             # Calculated values
             pixel_size = ""
@@ -314,7 +354,7 @@ class PROJECTOR_OT_export_csv(Operator):
                     image_height = f"{screen_h:.3f}"
                     
                     # Calculate lux
-                    lux_value = calculate_lux(proj_settings.power, screen_w, screen_h)
+                    lux_value = calculate_lux(proj_settings.lumens, screen_w, screen_h)
                     lux = f"{lux_value:.0f}"
                     
                     # Calculate pixel size (taking only width for simplicity)
@@ -325,11 +365,11 @@ class PROJECTOR_OT_export_csv(Operator):
                     pass
             
             # Create row
-            row = [
-                vp_name, brand, model, resolution, lens, orientation,
-                throw_ratio, pan, tilt, dpan, shift_h, shift_v,
-                pixel_size, lux, screen_distance, image_width, image_height
-            ]
+            # Create row avec formatage des valeurs numériques
+            row = [vp_name, brand, model, resolution, f"{lumens_value:.0f}", lens, orientation, 
+                f"{throw_ratio:.2f}", f"{math.degrees(pan):.0f}", f"{math.degrees(tilt):.0f}", f"{math.degrees(dpan):.0f}",
+                f"{shift_h:.2f}", f"{shift_v:.2f}", f"{float(pixel_size):.2f}" if pixel_size else "", lux,
+                f"{screen_distance:.2f}", f"{float(image_width):.2f}" if image_width else "", f"{float(image_height):.2f}" if image_height else ""]
             rows.append(row)
             
             # Special case: if orientation is "Paysage Dual", add duplicate row
@@ -378,7 +418,7 @@ class PROJECTOR_OT_export_csv(Operator):
 
 class PROJECTOR_PT_projector_settings(Panel):
     bl_idname = 'OBJECT_PT_projector_n_panel'
-    bl_label = 'Proj By Lotchi 25.1.2'
+    bl_label = 'Proj By Lotchi 25.1.6'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "Proj By Lotchi"
@@ -425,36 +465,36 @@ class PROJECTOR_PT_projector_settings(Panel):
             export_row.operator('projector.export_csv', text="Export CSV", icon='EXPORT')
             
             # Boutons de couleurs de projection
-            colors_box = info_box.box()
-            colors_box.label(text="Projection Colors:", icon='COLOR')
+            # colors_box = info_box.box()
+            # colors_box.label(text="Projection Colors:", icon='COLOR')
             
-            # Première ligne : White, Red, Blue, Green
-            colors_row1 = colors_box.row(align=True)
+            # # Première ligne : White, Red, Blue, Green
+            # colors_row1 = colors_box.row(align=True)
             
-            white_op = colors_row1.operator('projector.set_color', text="WHI")
-            white_op.color = (1.0, 1.0, 1.0)  # White
+            # white_op = colors_row1.operator('projector.set_color', text="WHI")
+            # white_op.color = (1.0, 1.0, 1.0)  # White
             
-            red_op = colors_row1.operator('projector.set_color', text="RED")
-            red_op.color = (1.0, 0.0, 0.0)  # Red
+            # red_op = colors_row1.operator('projector.set_color', text="RED")
+            # red_op.color = (1.0, 0.0, 0.0)  # Red
             
-            blue_op = colors_row1.operator('projector.set_color', text="BLU")
-            blue_op.color = (0.0, 0.0, 1.0)  # Blue
+            # blue_op = colors_row1.operator('projector.set_color', text="BLU")
+            # blue_op.color = (0.0, 0.0, 1.0)  # Blue
             
-            green_op = colors_row1.operator('projector.set_color', text="GRE")
-            green_op.color = (0.0, 1.0, 0.0)  # Green
+            # green_op = colors_row1.operator('projector.set_color', text="GRE")
+            # green_op.color = (0.0, 1.0, 0.0)  # Green
     
             
-            magenta_op = colors_row1.operator('projector.set_color', text="MAG")
-            magenta_op.color = (1.0, 0.0, 1.0)  # Magenta
+            # magenta_op = colors_row1.operator('projector.set_color', text="MAG")
+            # magenta_op.color = (1.0, 0.0, 1.0)  # Magenta
             
-            yellow_op = colors_row1.operator('projector.set_color', text="YEL")
-            yellow_op.color = (1.0, 1.0, 0.0)  # Yellow
+            # yellow_op = colors_row1.operator('projector.set_color', text="YEL")
+            # yellow_op.color = (1.0, 1.0, 0.0)  # Yellow
             
-            cyan_op = colors_row1.operator('projector.set_color', text="CYA")
-            cyan_op.color = (0.0, 1.0, 1.0)  # Cyan
+            # cyan_op = colors_row1.operator('projector.set_color', text="CYA")
+            # cyan_op.color = (0.0, 1.0, 1.0)  # Cyan
             
-            # Espace pour équilibrer
-            colors_row1.operator('projector.change_color', text="?", icon='QUESTION')
+            # # Espace pour équilibrer
+            # colors_row1.operator('projector.change_color', text="?", icon='QUESTION')
 
             # === PROPRIÉTÉS - SEULEMENT SI UN SEUL PROJECTEUR ===
             if len(selected_projectors) == 1:
@@ -465,8 +505,15 @@ class PROJECTOR_PT_projector_settings(Panel):
                 layout.label(text='Projector Settings:')
                 box = layout.box()
                 box.prop(proj_settings, 'orientation', text='Orientation')
+                # Base de données projecteurs
+                db_col = box.column(align=True)
+                db_col.prop(proj_settings, 'projector_brand', text='Brand')
+                db_col.prop(proj_settings, 'projector_model', text='Model') 
+                db_col.prop(proj_settings, 'projector_lens', text='Lens')
+                box.separator()
                 box.prop(proj_settings, 'throw_ratio')
                 box.prop(proj_settings, 'power', text='Power')
+                box.prop(proj_settings, 'lumens', text='Lumens')
                 res_row = box.row()
                 res_row.prop(proj_settings, 'resolution',
                              text='Resolution', icon='PRESET')
@@ -495,9 +542,17 @@ class PROJECTOR_PT_projector_settings(Panel):
                 
                 # Lens Shift
                 col = box.column(align=True)
-                col.prop(proj_settings,
-                         'h_shift', text='Horizontal Shift')
+                col.prop(proj_settings, 'h_shift', text='Horizontal Shift')
                 col.prop(proj_settings, 'v_shift', text='Vertical Shift')
+
+                # Petit espace
+                col.separator()
+
+                # Reset button plus petit en largeur
+                reset_row = col.row()
+                reset_row.scale_x = 0.6
+                reset_row.operator('projector.reset_values', text='Reset Values', icon='LOOP_BACK')
+                
                 # Screen Auto-Sizing
                 layout.separator()
                 auto_box = layout.box()
@@ -516,28 +571,32 @@ class PROJECTOR_PT_projector_settings(Panel):
                                                                   proj_settings.resolution)
                         
                         # Calcul des lux
-                        lux = calculate_lux(proj_settings.power, screen_w, screen_h)
+                        lux = calculate_lux(proj_settings.lumens, screen_w, screen_h)
                         
                         # Calcul de la taille de pixel
                         pixel_w_mm, pixel_h_mm = calculate_pixel_size(screen_w, screen_h, proj_settings.resolution)
                         
-                        # Affichage des informations
-                        auto_box.label(text=f"Distance: {parent_obj['SCREEN_DISTANCE']:.1f}m, TR: {proj_settings.throw_ratio:.2f}", icon='INFO')
+                        # Affichage des informations avec espacement réduit
+                        info_col = auto_box.column(align=True)  # align=True réduit l'espacement
+                        info_col.scale_y = 0.8  # Facteur de réduction de l'espacement vertical
+                        
+                        info_col.label(text=f"Distance: {parent_obj['SCREEN_DISTANCE']:.1f}m, TR: {proj_settings.throw_ratio:.2f}", icon='INFO')
+                        
                         # Calcul du ratio d'image
                         res_w, res_h = proj_settings.resolution.split('x')
                         image_ratio = float(res_w) / float(res_h)
                         
-                        auto_box.label(text=f"Screen: {screen_w:.2f}×{screen_h:.2f}m (Ratio: {image_ratio:.1f})", icon='MESH_PLANE')
-                        auto_box.label(text=f"Lux: {lux:.0f} lx", icon='LIGHT_SUN')
-                        auto_box.label(text=f"Pixel: {pixel_w_mm:.2f}mm", icon='GRID')
+                        info_col.label(text=f"Screen: {screen_w:.2f}×{screen_h:.2f}m (Ratio: {image_ratio:.1f})", icon='MESH_PLANE')
+                        info_col.label(text=f"Lux: {lux:.0f} lx", icon='LIGHT_SUN')
+                        info_col.label(text=f"Pixel: {pixel_w_mm:.2f}mm", icon='GRID')
                         
                     except Exception as e:
                         # Fallback en cas d'erreur
                         auto_box.label(text="Calculation error", icon='ERROR')
                 layout.prop(proj_settings,
                             'projected_texture', text='Project')
-                # Pixel Grid
-                box.prop(proj_settings, 'show_pixel_grid')
+                # Pixel Grid TO DELETE ??
+                #box.prop(proj_settings, 'show_pixel_grid')
 
                 # Custom Texture
                 if proj_settings.projected_texture == Textures.CUSTOM_TEXTURE.value:
@@ -596,6 +655,7 @@ def register():
     bpy.utils.register_class(PROJECTOR_PT_projected_color)
     bpy.utils.register_class(PROJECTOR_OT_export_csv)
     bpy.utils.register_class(PROJECTOR_OT_set_color)
+    bpy.utils.register_class(PROJECTOR_OT_reset_values)
     # Register create  in the blender add menu.
     bpy.types.VIEW3D_MT_light_add.append(append_to_add_menu)
 
@@ -604,6 +664,7 @@ def unregister():
     # Register create in the blender add menu.
     bpy.types.VIEW3D_MT_light_add.remove(append_to_add_menu)
     bpy.utils.register_class(PROJECTOR_OT_set_color)
+    bpy.utils.unregister_class(PROJECTOR_OT_reset_values)
     bpy.utils.unregister_class(PROJECTOR_OT_export_csv)
     bpy.utils.unregister_class(PROJECTOR_PT_projected_color)
     bpy.utils.unregister_class(PROJECTOR_PT_projector_settings)

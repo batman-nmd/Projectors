@@ -9,6 +9,8 @@ from bpy.types import Operator
 from .helper import (ADDON_ID, auto_offset,
                      get_projectors, get_projector, random_color)
 
+from .projector_database import get_brands, get_models, get_lenses, update_projector_brand, update_projector_model
+
 logging.basicConfig(
     format='[Projectors Addon]: %(name)s - %(levelname)s - %(message)s')
 log = logging.getLogger(name=__file__)
@@ -114,6 +116,53 @@ def update_orientation(proj_settings, context):
             dual_obj.hide_set(True)
             dual_obj.hide_render = True
             log.info(f"Dual object {dual_obj.name} hidden")
+
+def update_projector_model_local(proj_settings, context):
+    """Version locale de update_projector_model"""
+    from .projector_database import PROJECTOR_DATABASE
+    
+    proj_settings.projector_lens = 'NONE'
+    
+    brand = proj_settings.projector_brand
+    model = proj_settings.projector_model
+    
+    print(f"LOCAL DEBUG: Brand: {brand}, Model: {model}")
+    
+    if (brand in PROJECTOR_DATABASE and 
+        model in PROJECTOR_DATABASE[brand]):
+        
+        first_lens = next(iter(PROJECTOR_DATABASE[brand][model].values()))
+        new_lumens = first_lens['ansi_lumens']
+        proj_settings.lumens = new_lumens
+        print(f"LOCAL DEBUG: Lumens set to {new_lumens}")
+        
+        # Force UI refresh
+        bpy.context.area.tag_redraw() if bpy.context.area else None
+
+def update_projector_lens_local(proj_settings, context):
+    """Version locale de update_projector_lens"""
+    from .projector_database import PROJECTOR_DATABASE, BARCO_SHIFT_COEFFICIENT
+    
+    brand = proj_settings.projector_brand
+    model = proj_settings.projector_model
+    lens = proj_settings.projector_lens
+    
+    print(f"LOCAL DEBUG LENS: Brand: {brand}, Model: {model}, Lens: {lens}")
+    
+    if (brand in PROJECTOR_DATABASE and 
+        model in PROJECTOR_DATABASE[brand] and 
+        lens in PROJECTOR_DATABASE[brand][model]):
+        
+        lens_data = PROJECTOR_DATABASE[brand][model][lens]
+        
+        # Mettre à jour SEULEMENT les lumens (pas les shift ranges qui n'existent pas)
+        proj_settings.lumens = lens_data['ansi_lumens']
+        print(f"LOCAL DEBUG LENS: Lumens set to {lens_data['ansi_lumens']}")
+        
+        # Force UI refresh
+        bpy.context.area.tag_redraw() if bpy.context.area else None
+    else:
+        print(f"LOCAL DEBUG LENS: Brand/Model/Lens not found in database")
 class Textures(Enum):
     CHECKER = 'checker_texture'
     COLOR_GRID = 'color_grid_texture'
@@ -605,9 +654,11 @@ def update_checker_color(proj_settings, context):
 
 
 def update_power(proj_settings, context):
-    # Update spotlight power
+    # Update spotlight power - convertir le pourcentage en intensité
     spot = get_projector(context).children[0]
-    spot.data.energy = proj_settings["power"]
+    power_percentage = proj_settings["power"]
+    actual_power = (power_percentage / 100.0) * 10000.0
+    spot.data.energy = actual_power
 
 
 def update_pixel_grid(proj_settings, context):
@@ -776,7 +827,8 @@ def create_projector(context):
 def init_projector(proj_settings, context):
     # # Add custom properties to store projector settings on the camera obj.
     proj_settings.throw_ratio = 0.8
-    proj_settings.power = 18500.0
+    proj_settings.power = 100.0
+    proj_settings.lumens = 10000.0
     proj_settings.projected_texture = Textures.CHECKER.value
     proj_settings.h_shift = 0.0
     proj_settings.v_shift = 0.0
@@ -855,6 +907,10 @@ class PROJECTOR_OT_delete_projector(Operator):
                 bpy.data.objects.remove(projector, do_unlink=True)
         return {'FINISHED'}
 
+def update_lumens(proj_settings, context):
+    """Mettre à jour les calculs quand les lumens changent"""
+    # Optionnel : déclencher une mise à jour des calculs de lux
+    pass
 
 class ProjectorSettings(bpy.types.PropertyGroup):
     orientation: bpy.props.EnumProperty(
@@ -867,17 +923,45 @@ class ProjectorSettings(bpy.types.PropertyGroup):
         ],
         default='LANDSCAPE',
         update=update_orientation)
+    projector_brand: bpy.props.EnumProperty(
+        name="Brand",
+        description="Projector brand", 
+        items=get_brands,
+        update=update_projector_brand)
+
+    projector_model: bpy.props.EnumProperty(
+        name="Model",
+        description="Projector model",
+        items=get_models,
+        update=update_projector_model_local)
+
+    projector_lens: bpy.props.EnumProperty(
+        name="Lens",
+        description="Projector lens/optic", 
+        items=get_lenses,
+        update=update_projector_lens_local)
     throw_ratio: bpy.props.FloatProperty(
         name="Throw Ratio",
         soft_min=0.4, soft_max=3,
         update=update_throw_ratio,
+        precision=2,
         subtype='FACTOR')
     power: bpy.props.FloatProperty(
-        name="Projector Power",
-        default=18500.0,
-        soft_min=0, soft_max=999999,
+        name="Light Power",
+        description="Light intensity percentage (0-100%)",
+        default=100.0,
+        soft_min=0, soft_max=100,
+        precision=0,
         update=update_power,
-        unit='POWER')
+        subtype='PERCENTAGE')
+    lumens: bpy.props.FloatProperty(
+    name="Projector Lumens",
+    description="Projector brightness in ANSI lumens",
+    default=10000.0,
+    soft_min=0, soft_max=50000,
+    precision=0,
+    unit='NONE',
+    update=update_lumens)
     resolution: bpy.props.EnumProperty(
         items=RESOLUTIONS,
         default='1920x1200',
