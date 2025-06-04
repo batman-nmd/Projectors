@@ -7,15 +7,15 @@ Ce document liste toutes les fonctionnalités prévues pour les futures versions
 ### ⭐⭐⭐ Haute priorité
 - [x] Sélection multiple d'objets 
 - [ ] Patterns de test simples (WHITE, BLUE, etc.)
-- [ ] Calculs techniques (Lux + taille pixel)
-- [ ] Ajustement automatique taille écran
+- [x] Calculs techniques (Lux + taille pixel)
+- [x] Ajustement automatique taille écran
 - [ ] Définir si c'est Portrait ou paysage
 - [ ] Fonction Mirror XZ, si c'est Portrait tel Mirror, si c'est Paysage tel Mirror
 - [ ] Bouton Dupliquer Mirror Renommer Delete
 - [ ] Ajouter le control de la hauteur dans l'UI
 
 ### ⭐⭐ Moyenne priorité  
-- [ ] Offset automatique de l'écran avec shift caméra
+- [x] Offset automatique de l'écran avec shift caméra
 - [ ] Base de données de projecteurs
 - [ ] Export CSV des données
 - [ ] Faire une explication sur comment riger un nouveau VP

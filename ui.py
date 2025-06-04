@@ -1,5 +1,5 @@
 from .helper import get_projectors
-from .projector import RESOLUTIONS, Textures, calculate_screen_size
+from .projector import RESOLUTIONS, Textures, calculate_screen_size, calculate_lux, calculate_pixel_size
 
 import bpy
 from bpy.types import Panel, PropertyGroup, UIList, Operator
@@ -255,6 +255,7 @@ class PROJECTOR_PT_projector_settings(Panel):
 
                 layout.label(text='Projector Settings:')
                 box = layout.box()
+                box.prop(proj_settings, 'orientation', text='Orientation')
                 box.prop(proj_settings, 'throw_ratio')
                 box.prop(proj_settings, 'power', text='Power')
                 res_row = box.row()
@@ -298,15 +299,31 @@ class PROJECTOR_PT_projector_settings(Panel):
 
                 # Afficher les informations de calcul si disponible
                 if parent_obj and "SCREEN_DISTANCE" in parent_obj:
-                    info_text = f"Distance: {parent_obj['SCREEN_DISTANCE']:.1f}m, TR: {proj_settings.throw_ratio:.2f}"
                     try:
+                        # Calculs de base
                         screen_w, screen_h = calculate_screen_size(proj_settings.throw_ratio, 
                                                                   parent_obj["SCREEN_DISTANCE"], 
                                                                   proj_settings.resolution)
-                        info_text += f" → {screen_w:.2f}×{screen_h:.2f}m"
-                    except:
-                        pass
-                    auto_box.label(text=info_text, icon='INFO')
+                        
+                        # Calcul des lux
+                        lux = calculate_lux(proj_settings.power, screen_w, screen_h)
+                        
+                        # Calcul de la taille de pixel
+                        pixel_w_mm, pixel_h_mm = calculate_pixel_size(screen_w, screen_h, proj_settings.resolution)
+                        
+                        # Affichage des informations
+                        auto_box.label(text=f"Distance: {parent_obj['SCREEN_DISTANCE']:.1f}m, TR: {proj_settings.throw_ratio:.2f}", icon='INFO')
+                        # Calcul du ratio d'image
+                        res_w, res_h = proj_settings.resolution.split('x')
+                        image_ratio = float(res_w) / float(res_h)
+                        
+                        auto_box.label(text=f"Screen: {screen_w:.2f}×{screen_h:.2f}m (Ratio: {image_ratio:.1f})", icon='MESH_PLANE')
+                        auto_box.label(text=f"Lux: {lux:.0f} lx", icon='LIGHT_SUN')
+                        auto_box.label(text=f"Pixel: {pixel_w_mm:.2f}mm", icon='GRID')
+                        
+                    except Exception as e:
+                        # Fallback en cas d'erreur
+                        auto_box.label(text="Calculation error", icon='ERROR')
                 layout.prop(proj_settings,
                             'projected_texture', text='Project')
                 # Pixel Grid

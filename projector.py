@@ -27,6 +27,29 @@ def calculate_screen_size(throw_ratio, screen_distance, resolution):
     
     return screen_width, screen_height
 
+def calculate_lux(power_lumens_ansi, screen_width, screen_height):
+    """
+    Calcule les lux sur l'écran
+    Lux = Lumens ANSI / Surface_écran_m²
+    """
+    surface_m2 = (screen_width * screen_height)
+    if surface_m2 > 0:
+        return power_lumens_ansi / surface_m2
+    return 0
+
+def calculate_pixel_size(screen_width, screen_height, resolution):
+    """
+    Calcule la taille physique d'un pixel sur l'écran
+    """
+    res_w, res_h = resolution.split('x')
+    pixel_width_m = screen_width / float(res_w)
+    pixel_height_m = screen_height / float(res_h)
+    
+    # Convertir en millimètres
+    pixel_width_mm = pixel_width_m * 1000
+    pixel_height_mm = pixel_height_m * 1000
+    
+    return pixel_width_mm, pixel_height_mm
 
 def find_screen_object_recursive(obj):
     """Trouve récursivement un objet dont le nom contient 'écran' ou 'screen'"""
@@ -711,6 +734,14 @@ class PROJECTOR_OT_delete_projector(Operator):
 
 
 class ProjectorSettings(bpy.types.PropertyGroup):
+    orientation: bpy.props.EnumProperty(
+        name="Orientation",
+        description="Screen orientation",
+        items=[
+            ('LANDSCAPE', 'Paysage', 'Landscape orientation', 'LANDSCAPE', 0),
+            ('PORTRAIT', 'Portrait', 'Portrait orientation', 'PORTRAIT', 1)
+        ],
+        default='LANDSCAPE')
     throw_ratio: bpy.props.FloatProperty(
         name="Throw Ratio",
         soft_min=0.4, soft_max=3,
