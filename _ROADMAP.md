@@ -9,7 +9,8 @@ Ce document liste toutes les fonctionnalités prévues pour les futures versions
 - [ ] Patterns de test simples (WHITE, BLUE, etc.)
 - [x] Calculs techniques (Lux + taille pixel)
 - [x] Ajustement automatique taille écran
-- [ ] Définir si c'est Portrait ou paysage
+- [x] Définir si c'est Portrait ou paysage 
+- [x] Option Paysage Dual disponible, si coché double ligne dans CSV, et visibilité d'un objet dont le nom contient "dual" (ne pas mettre de caméra dedans)
 - [ ] Fonction Mirror XZ, si c'est Portrait tel Mirror, si c'est Paysage tel Mirror
 - [ ] Bouton Dupliquer Mirror Renommer Delete
 - [ ] Ajouter le control de la hauteur dans l'UI
@@ -17,7 +18,7 @@ Ce document liste toutes les fonctionnalités prévues pour les futures versions
 ### ⭐⭐ Moyenne priorité  
 - [x] Offset automatique de l'écran avec shift caméra
 - [ ] Base de données de projecteurs
-- [ ] Export CSV des données
+- [x] Export CSV des données
 - [ ] Faire une explication sur comment riger un nouveau VP
 - [ ] texturing de VP, mettre une couleur sur un VP (noir, rose, cyan, jaune)
 - [ ] Avoir un bouton Open wider throw ratio -+15% (présent meme en sélection de groupe ?), changer aussi la résolution du projet ?

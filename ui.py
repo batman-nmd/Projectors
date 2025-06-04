@@ -202,6 +202,144 @@ def get_light_button_text(context):
     else:
         return "Light"
 
+class PROJECTOR_OT_export_csv(Operator):
+    """Export projector data to CSV"""
+    bl_idname = 'projector.export_csv'
+    bl_label = 'Export to CSV'
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+    filename_ext = ".csv"
+    
+    filter_glob: bpy.props.StringProperty(
+        default="*.csv",
+        options={'HIDDEN'},
+        maxlen=255,
+    )
+    
+    def execute(self, context):
+        import csv
+        import os
+        
+        projectors = get_projectors(context, only_selected=True)
+        if not projectors:
+            self.report({'WARNING'}, "No projectors selected")
+            return {'FINISHED'}
+        
+        # CSV headers (normalized in English)
+        headers = [
+            'vp_name', 'brand', 'model', 'resolution', 'lens', 'orientation', 
+            'throw_ratio', 'pan', 'tilt', 'dpan', 'shift_h', 'shift_v', 
+            'pixel_size', 'lux', 'screen_distance', 'image_width', 'image_height'
+        ]
+        
+        rows = []
+        
+        for projector in projectors:
+            proj_settings = projector.proj_settings
+            
+            # Get parent object for custom properties
+            parent_obj = context.active_object if context.active_object != projector else projector.parent
+            if not parent_obj:
+                parent_obj = projector
+            
+            # Basic info
+            vp_name = projector.name
+            brand = parent_obj.get("BRAND", "")  # Custom property if exists
+            model = parent_obj.get("MODEL", "")  # Custom property if exists
+            resolution = proj_settings.resolution
+            lens = parent_obj.get("LENS", "")  # Custom property if exists
+            orientation = proj_settings.orientation
+            throw_ratio = proj_settings.throw_ratio
+            
+            # Movement properties
+            pan = parent_obj.get("VP_PAN", 0)
+            tilt = parent_obj.get("VP_TILT", 0)
+            dpan = parent_obj.get("VP_DOUBLE_PAN", 0)
+            
+            # Shift properties
+            shift_h = proj_settings.h_shift
+            shift_v = proj_settings.v_shift
+            
+            # Screen distance
+            screen_distance = parent_obj.get("SCREEN_DISTANCE", 0)
+            
+            # Calculated values
+            pixel_size = ""
+            lux = ""
+            image_width = ""
+            image_height = ""
+            
+            if screen_distance > 0:
+                try:
+                    # Calculate screen size
+                    screen_w, screen_h = calculate_screen_size(throw_ratio, screen_distance, resolution)
+                    image_width = f"{screen_w:.3f}"
+                    image_height = f"{screen_h:.3f}"
+                    
+                    # Calculate lux
+                    lux_value = calculate_lux(proj_settings.power, screen_w, screen_h)
+                    lux = f"{lux_value:.0f}"
+                    
+                    # Calculate pixel size (taking only width for simplicity)
+                    pixel_w_mm, pixel_h_mm = calculate_pixel_size(screen_w, screen_h, resolution)
+                    pixel_size = f"{pixel_w_mm:.2f}"
+                    
+                except Exception as e:
+                    pass
+            
+            # Create row
+            row = [
+                vp_name, brand, model, resolution, lens, orientation,
+                throw_ratio, pan, tilt, dpan, shift_h, shift_v,
+                pixel_size, lux, screen_distance, image_width, image_height
+            ]
+            rows.append(row)
+            
+            # Special case: if orientation is "Paysage Dual", add duplicate row
+            if orientation == 'LANDSCAPE DUAL':
+                dual_row = row.copy()
+                dual_row[0] = vp_name + " DUAL"  # Change name
+                rows.append(dual_row)
+        
+        # Write CSV
+        try:
+            with open(self.filepath, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(headers)
+                writer.writerows(rows)
+            
+            self.report({'INFO'}, f"Exported {len(rows)} projector(s) to {os.path.basename(self.filepath)}")
+            
+        except Exception as e:
+            self.report({'ERROR'}, f"Export failed: {str(e)}")
+            return {'CANCELLED'}
+        
+        return {'FINISHED'}
+    
+    def invoke(self, context, event):
+        import os
+        
+        # Récupérer le chemin du fichier Blender actuel
+        blend_filepath = bpy.data.filepath
+        if blend_filepath:
+            # Utiliser le même dossier que le fichier Blender
+            blend_folder = os.path.dirname(blend_filepath)
+            # Extraire le nom du fichier sans l'extension .blend
+            blend_filename = os.path.basename(blend_filepath)
+            base_name = os.path.splitext(blend_filename)[0]  # Supprime l'extension
+            default_filename = f"{base_name}.csv"
+        else:
+            # Fichier non sauvegardé, utiliser le dossier Downloads
+            blend_folder = os.path.join(os.path.expanduser("~"), "Downloads")
+            default_filename = "projectors_export.csv"
+        
+        # Chemin complet par défaut
+        self.filepath = os.path.join(blend_folder, default_filename)
+        
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
 class PROJECTOR_PT_projector_settings(Panel):
     bl_idname = 'OBJECT_PT_projector_n_panel'
     bl_label = 'Proj By Lotchi 25.1.2'
@@ -246,6 +384,9 @@ class PROJECTOR_PT_projector_settings(Panel):
             buttons_row.operator('projector.toggle_screen', text=screen_btn_text, icon='HIDE_OFF')
             light_btn_text = get_light_button_text(context)
             buttons_row.operator('projector.toggle_light', text=light_btn_text, icon='LIGHT')
+            # Bouton Export en dessous
+            export_row = info_box.row()
+            export_row.operator('projector.export_csv', text="Export CSV", icon='EXPORT')
 
             # === PROPRIÉTÉS - SEULEMENT SI UN SEUL PROJECTEUR ===
             if len(selected_projectors) == 1:
@@ -292,7 +433,7 @@ class PROJECTOR_PT_projector_settings(Panel):
                 # Screen Auto-Sizing
                 layout.separator()
                 auto_box = layout.box()
-                auto_box.label(text="Screen Auto-Sizing:", icon='AUTO')
+                auto_box.label(text="Projection infos")
                 auto_box.operator('projector.auto_adjust_screen_size', 
                                   text="Adjust Screen Size", 
                                   icon='FULLSCREEN_ENTER')
@@ -384,6 +525,7 @@ def register():
     bpy.utils.register_class(PROJECTOR_OT_toggle_light)
     bpy.utils.register_class(PROJECTOR_PT_projector_settings)
     bpy.utils.register_class(PROJECTOR_PT_projected_color)
+    bpy.utils.register_class(PROJECTOR_OT_export_csv)
     # Register create  in the blender add menu.
     bpy.types.VIEW3D_MT_light_add.append(append_to_add_menu)
 
@@ -391,6 +533,7 @@ def register():
 def unregister():
     # Register create in the blender add menu.
     bpy.types.VIEW3D_MT_light_add.remove(append_to_add_menu)
+    bpy.utils.unregister_class(PROJECTOR_OT_export_csv)
     bpy.utils.unregister_class(PROJECTOR_PT_projected_color)
     bpy.utils.unregister_class(PROJECTOR_PT_projector_settings)
     bpy.utils.unregister_class(PROJECTOR_OT_focus_selected)

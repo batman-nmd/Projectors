@@ -69,6 +69,51 @@ def find_screen_object_recursive(obj):
     
     return None
 
+def find_dual_object_recursive(obj):
+    """Trouve récursivement un objet dont le nom contient 'dual'"""
+    if not obj:
+        return None
+    
+    # Vérifier l'objet actuel
+    name_lower = obj.name.lower()
+    if 'dual' in name_lower:
+        return obj
+    
+    # Recherche récursive dans tous les enfants
+    for child in obj.children:
+        result = find_dual_object_recursive(child)
+        if result:
+            return result
+    
+    return None
+
+def update_orientation(proj_settings, context):
+    """
+    Met à jour la visibilité des objets selon l'orientation
+    """
+    projector = get_projector(context)
+    
+    # Chercher l'objet parent qui pourrait contenir l'objet dual
+    parent_obj = context.active_object if context.active_object != projector else projector.parent
+    if not parent_obj:
+        parent_obj = projector
+    
+    # Trouver l'objet dual
+    dual_obj = find_dual_object_recursive(parent_obj)
+    if not dual_obj:
+        dual_obj = find_dual_object_recursive(projector)
+    
+    if dual_obj:
+        if proj_settings.orientation == 'LANDSCAPE DUAL':
+            # Afficher l'objet dual (viewport ET rendu)
+            dual_obj.hide_set(False)
+            dual_obj.hide_render = False
+            log.info(f"Dual object {dual_obj.name} made visible")
+        else:
+            # Cacher l'objet dual (viewport ET rendu)
+            dual_obj.hide_set(True)
+            dual_obj.hide_render = True
+            log.info(f"Dual object {dual_obj.name} hidden")
 class Textures(Enum):
     CHECKER = 'checker_texture'
     COLOR_GRID = 'color_grid_texture'
@@ -433,12 +478,9 @@ def update_throw_ratio(proj_settings, context):
     # Update lens shift because it depends on the throw ratio.
     update_lens_shift(proj_settings, context)
 
-    
-
-
 def update_lens_shift(proj_settings, context):
     """
-    Apply the shift to the camera and texture.
+    Apply the shift to the camera, texture, and screen position.
     """
     projector = get_projector(context)
     h_shift = proj_settings.get('h_shift', 0.0) / 100
@@ -463,6 +505,55 @@ def update_lens_shift(proj_settings, context):
         nodes['Mapping.001'].inputs[1].default_value[0] = h_shift / throw_ratio
         nodes['Mapping.001'].inputs[1].default_value[1] = v_shift / throw_ratio * inverted_aspect_ratio
 
+    # ===== Déplacer l'écran automatiquement =====
+    
+    # Chercher l'objet parent qui pourrait contenir l'écran
+    parent_obj = context.active_object if context.active_object != projector else projector.parent
+    if not parent_obj:
+        parent_obj = projector
+    
+    # Trouver l'objet écran
+    screen_obj = find_screen_object_recursive(parent_obj)
+    if not screen_obj:
+        screen_obj = find_screen_object_recursive(projector)
+    
+    if screen_obj:
+        # Obtenir la distance à l'écran
+        screen_distance = None
+        if "SCREEN_DISTANCE" in parent_obj:
+            screen_distance = parent_obj["SCREEN_DISTANCE"]
+        elif "SCREEN_DISTANCE" in projector:
+            screen_distance = projector["SCREEN_DISTANCE"]
+        
+        if screen_distance:
+            # Calculer le déplacement physique de l'écran basé sur le lens shift
+            try:
+                screen_width, screen_height = calculate_screen_size(throw_ratio, screen_distance, proj_settings.resolution)
+                
+                # Le déplacement de l'écran dépend de l'orientation
+                if proj_settings.orientation == 'PORTRAIT':
+                    screen_offset_x = -v_shift * screen_height  # V devient X
+                    screen_offset_z = -h_shift * screen_width   # H devient Z
+                else:  # PAYSAGE
+                    screen_offset_x = h_shift * screen_width   # X = largeur
+                    screen_offset_z = v_shift * screen_height  # Z = hauteur
+                
+                # Appliquer le déplacement à l'écran
+                if '_original_location' not in screen_obj:
+                    # Sauvegarder la position originale la première fois
+                    screen_obj['_original_location'] = list(screen_obj.location)
+                
+                # Récupérer la position originale sauvegardée
+                original_loc = screen_obj['_original_location']
+                
+                # Appliquer le nouvel offset à partir de la position originale
+                screen_obj.location[0] = original_loc[0] + screen_offset_x
+                screen_obj.location[2] = original_loc[2] + screen_offset_z
+                
+                log.debug(f"Screen offset applied: X={screen_offset_x:.3f}m, Z={screen_offset_z:.3f}m")
+                
+            except Exception as e:
+                log.warning(f"Could not calculate screen offset: {e}")
 
 def update_resolution(proj_settings, context):
     projector = get_projector(context)
@@ -739,9 +830,11 @@ class ProjectorSettings(bpy.types.PropertyGroup):
         description="Screen orientation",
         items=[
             ('LANDSCAPE', 'Paysage', 'Landscape orientation', 'LANDSCAPE', 0),
-            ('PORTRAIT', 'Portrait', 'Portrait orientation', 'PORTRAIT', 1)
+            ('LANDSCAPE DUAL', 'Paysage Dual', 'Landscape dual orientation', 'LANDSCAPE DUAL', 1),
+            ('PORTRAIT', 'Portrait', 'Portrait orientation', 'PORTRAIT', 2)
         ],
-        default='LANDSCAPE')
+        default='LANDSCAPE',
+        update=update_orientation)
     throw_ratio: bpy.props.FloatProperty(
         name="Throw Ratio",
         soft_min=0.4, soft_max=3,
