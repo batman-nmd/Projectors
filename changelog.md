@@ -5,7 +5,7 @@ Toutes les modifications importantes de ce projet seront documentées dans ce fi
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Versioning Sémantique](https://semver.org/lang/fr/).
 
-## [2025.1.2] - 2025-06-03
+## [2025.1.3] - 2025-06-04
 
 ### Ajouté
 - **Sélection par objet parent** : Plus besoin de sélectionner directement la caméra projecteur
@@ -24,6 +24,7 @@ et ce projet adhère au [Versioning Sémantique](https://semver.org/lang/fr/).
 - **Recherche récursive avancée** pour les objets écran dans toute la hiérarchie
 - **Synchronisation complète** des systèmes de visibilité (viewport + render pour la lumière)
 - **Résolutions VP** il manquait 3840x2400 en 16:10
+- **Taille** Ajustement automatique taille écran quand on touche à distance écran et throw ratio
 
 ### Modifié
 - **Nom de l'onglet** : "Projector" → "Proj By Lotchi"

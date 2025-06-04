@@ -13,6 +13,38 @@ logging.basicConfig(
     format='[Projectors Addon]: %(name)s - %(levelname)s - %(message)s')
 log = logging.getLogger(name=__file__)
 
+def calculate_screen_size(throw_ratio, screen_distance, resolution):
+    """
+    Calcule la taille de l'écran selon throw ratio et distance
+    """
+    # Largeur image = distance / throw_ratio
+    screen_width = screen_distance / throw_ratio
+    
+    # Hauteur selon aspect ratio de la résolution
+    res_w, res_h = resolution.split('x')
+    aspect_ratio = float(res_w) / float(res_h)
+    screen_height = screen_width / aspect_ratio
+    
+    return screen_width, screen_height
+
+
+def find_screen_object_recursive(obj):
+    """Trouve récursivement un objet dont le nom contient 'écran' ou 'screen'"""
+    if not obj:
+        return None
+    
+    # Vérifier l'objet actuel
+    name_lower = obj.name.lower()
+    if 'écran' in name_lower or 'ecran' in name_lower or 'screen' in name_lower:
+        return obj
+    
+    # Recherche récursive dans tous les enfants
+    for child in obj.children:
+        result = find_screen_object_recursive(child)
+        if result:
+            return result
+    
+    return None
 
 class Textures(Enum):
     CHECKER = 'checker_texture'
@@ -62,6 +94,82 @@ class PROJECTOR_OT_change_color_randomly(Operator):
             update_checker_color(projector.proj_settings, context)
         return {'FINISHED'}
 
+class PROJECTOR_OT_auto_adjust_screen_size(Operator):
+    """Automatically adjust screen size based on throw ratio and distance"""
+    bl_idname = 'projector.auto_adjust_screen_size'
+    bl_label = 'Auto Adjust Screen Size'
+    bl_description = 'Automatically calculates and applies screen size based on throw ratio and screen distance'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        selected_projectors = get_projectors(context, only_selected=True)
+        return len(selected_projectors) >= 1
+
+    def execute(self, context):
+        selected_projectors = get_projectors(context, only_selected=True)
+        adjusted_screens = 0
+        
+        for projector in selected_projectors:
+            # Obtenir les paramètres du projecteur
+            proj_settings = projector.proj_settings
+            throw_ratio = proj_settings.throw_ratio
+            resolution = proj_settings.resolution
+            
+            # Chercher l'objet parent qui contient la distance écran
+            parent_obj = context.active_object if len(selected_projectors) == 1 else projector.parent
+            if not parent_obj:
+                parent_obj = projector
+            
+            # Vérifier si SCREEN_DISTANCE existe
+            screen_distance = None
+            if "SCREEN_DISTANCE" in parent_obj:
+                screen_distance = parent_obj["SCREEN_DISTANCE"]
+            elif "SCREEN_DISTANCE" in projector:
+                screen_distance = projector["SCREEN_DISTANCE"]
+            
+            if screen_distance is None:
+                self.report({'WARNING'}, f"No SCREEN_DISTANCE property found for {projector.name}")
+                continue
+            
+            # Calculer la taille de l'écran
+            try:
+                screen_width, screen_height = calculate_screen_size(throw_ratio, screen_distance, resolution)
+            except Exception as e:
+                self.report({'ERROR'}, f"Error calculating screen size for {projector.name}: {str(e)}")
+                continue
+            
+            # Trouver l'objet écran
+            screen_obj = find_screen_object_recursive(parent_obj)
+            if not screen_obj:
+                # Chercher dans le projecteur lui-même
+                screen_obj = find_screen_object_recursive(projector)
+            
+            if not screen_obj:
+                self.report({'WARNING'}, f"No screen object found for {projector.name}")
+                continue
+            
+            # Appliquer la nouvelle taille à l'écran
+            if screen_obj.type == 'MESH':
+                # Pour un mesh, on ajuste les dimensions
+                screen_obj.scale[0] = screen_width  # Largeur
+                screen_obj.scale[2] = screen_height  # Hauteur
+                # Garder l'échelle Y (profondeur) inchangée
+                
+                adjusted_screens += 1
+                
+                log.info(f"Adjusted screen {screen_obj.name}: {screen_width:.2f}m x {screen_height:.2f}m "
+                        f"(TR: {throw_ratio}, Dist: {screen_distance}m, Res: {resolution})")
+            
+            else:
+                self.report({'WARNING'}, f"Screen object {screen_obj.name} is not a mesh")
+        
+        if adjusted_screens > 0:
+            self.report({'INFO'}, f"Successfully adjusted {adjusted_screens} screen(s)")
+        else:
+            self.report({'WARNING'}, "No screens were adjusted")
+        
+        return {'FINISHED'}
 
 def create_projector_textures():
     """ This function checks if the needed images exist and if not creates them. """
@@ -304,10 +412,9 @@ def update_throw_ratio(proj_settings, context):
 
     
 
-
 def update_lens_shift(proj_settings, context):
     """
-    Apply the shift to the camera and texture.
+    Apply the shift to the camera, texture, and screen position.
     """
     projector = get_projector(context)
     h_shift = proj_settings.get('h_shift', 0.0) / 100
@@ -332,6 +439,52 @@ def update_lens_shift(proj_settings, context):
         nodes['Mapping.001'].inputs[1].default_value[0] = h_shift / throw_ratio
         nodes['Mapping.001'].inputs[1].default_value[1] = v_shift / throw_ratio * inverted_aspect_ratio
 
+    # ===== NOUVEAU : Déplacer l'écran automatiquement =====
+    
+    # Chercher l'objet parent qui pourrait contenir l'écran
+    parent_obj = context.active_object if context.active_object != projector else projector.parent
+    if not parent_obj:
+        parent_obj = projector
+    
+    # Trouver l'objet écran
+    screen_obj = find_screen_object_recursive(parent_obj)
+    if not screen_obj:
+        screen_obj = find_screen_object_recursive(projector)
+    
+    if screen_obj:
+        # Obtenir la distance à l'écran
+        screen_distance = None
+        if "SCREEN_DISTANCE" in parent_obj:
+            screen_distance = parent_obj["SCREEN_DISTANCE"]
+        elif "SCREEN_DISTANCE" in projector:
+            screen_distance = projector["SCREEN_DISTANCE"]
+        
+        if screen_distance:
+            # Calculer le déplacement physique de l'écran basé sur le lens shift
+            try:
+                screen_width, screen_height = calculate_screen_size(throw_ratio, screen_distance, proj_settings.resolution)
+                
+                # Le déplacement de l'écran est proportionnel au shift
+                screen_offset_x = h_shift * screen_width
+                screen_offset_z = v_shift * screen_height  # Z car c'est la hauteur dans Blender
+                
+                # Appliquer le déplacement à l'écran
+                if not hasattr(screen_obj, '_original_location'):
+                    # Sauvegarder la position originale la première fois
+                    screen_obj['_original_location'] = list(screen_obj.location)
+                    original_loc = screen_obj.location.copy()
+                else:
+                    # Récupérer la position originale sauvegardée
+                    original_loc = screen_obj['_original_location']
+                
+                # Appliquer le nouvel offset à partir de la position originale
+                screen_obj.location[0] = original_loc[0] + screen_offset_x  # X = largeur
+                screen_obj.location[2] = original_loc[2] + screen_offset_z  # Z = hauteur
+                
+                log.debug(f"Screen offset applied: X={screen_offset_x:.3f}m, Z={screen_offset_z:.3f}m")
+                
+            except Exception as e:
+                log.warning(f"Could not calculate screen offset: {e}")
 
 def update_resolution(proj_settings, context):
     projector = get_projector(context)
@@ -656,11 +809,14 @@ def register():
     bpy.utils.register_class(PROJECTOR_OT_create_projector)
     bpy.utils.register_class(PROJECTOR_OT_delete_projector)
     bpy.utils.register_class(PROJECTOR_OT_change_color_randomly)
+    bpy.utils.register_class(PROJECTOR_OT_auto_adjust_screen_size)
+
     bpy.types.Object.proj_settings = bpy.props.PointerProperty(
         type=ProjectorSettings)
 
 
 def unregister():
+    bpy.utils.unregister_class(PROJECTOR_OT_auto_adjust_screen_size)
     bpy.utils.unregister_class(PROJECTOR_OT_change_color_randomly)
     bpy.utils.unregister_class(PROJECTOR_OT_delete_projector)
     bpy.utils.unregister_class(PROJECTOR_OT_create_projector)

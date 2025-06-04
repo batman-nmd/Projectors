@@ -1,5 +1,5 @@
 from .helper import get_projectors
-from .projector import RESOLUTIONS, Textures
+from .projector import RESOLUTIONS, Textures, calculate_screen_size
 
 import bpy
 from bpy.types import Panel, PropertyGroup, UIList, Operator
@@ -288,6 +288,25 @@ class PROJECTOR_PT_projector_settings(Panel):
                 col.prop(proj_settings,
                          'h_shift', text='Horizontal Shift')
                 col.prop(proj_settings, 'v_shift', text='Vertical Shift')
+                # Screen Auto-Sizing
+                layout.separator()
+                auto_box = layout.box()
+                auto_box.label(text="Screen Auto-Sizing:", icon='AUTO')
+                auto_box.operator('projector.auto_adjust_screen_size', 
+                                  text="Adjust Screen Size", 
+                                  icon='FULLSCREEN_ENTER')
+
+                # Afficher les informations de calcul si disponible
+                if parent_obj and "SCREEN_DISTANCE" in parent_obj:
+                    info_text = f"Distance: {parent_obj['SCREEN_DISTANCE']:.1f}m, TR: {proj_settings.throw_ratio:.2f}"
+                    try:
+                        screen_w, screen_h = calculate_screen_size(proj_settings.throw_ratio, 
+                                                                  parent_obj["SCREEN_DISTANCE"], 
+                                                                  proj_settings.resolution)
+                        info_text += f" → {screen_w:.2f}×{screen_h:.2f}m"
+                    except:
+                        pass
+                    auto_box.label(text=info_text, icon='INFO')
                 layout.prop(proj_settings,
                             'projected_texture', text='Project')
                 # Pixel Grid
