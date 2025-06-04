@@ -184,10 +184,42 @@ class PROJECTOR_OT_auto_adjust_screen_size(Operator):
             throw_ratio = proj_settings.throw_ratio
             resolution = proj_settings.resolution
             
+            # DEBUG : Afficher les objets et leurs propriétés
+            print(f"DEBUG: Processing projector: {projector.name}")
+            print(f"DEBUG: Projector parent: {projector.parent.name if projector.parent else 'None'}")
+            print(f"DEBUG: Active object: {context.active_object.name if context.active_object else 'None'}")
+            print(f"DEBUG: Number of selected projectors: {len(selected_projectors)}")
+            
+            # Vérifier où se trouve SCREEN_DISTANCE
+            screen_distance_found = False
+            if "SCREEN_DISTANCE" in projector:
+                print(f"DEBUG: SCREEN_DISTANCE found in projector: {projector['SCREEN_DISTANCE']}")
+                screen_distance_found = True
+            if projector.parent and "SCREEN_DISTANCE" in projector.parent:
+                print(f"DEBUG: SCREEN_DISTANCE found in parent: {projector.parent['SCREEN_DISTANCE']}")
+                screen_distance_found = True
+            if context.active_object and "SCREEN_DISTANCE" in context.active_object:
+                print(f"DEBUG: SCREEN_DISTANCE found in active object: {context.active_object['SCREEN_DISTANCE']}")
+                screen_distance_found = True
+            
+            if not screen_distance_found:
+                print("DEBUG: SCREEN_DISTANCE not found anywhere!")
+            
             # Chercher l'objet parent qui contient la distance écran
-            parent_obj = context.active_object if len(selected_projectors) == 1 else projector.parent
-            if not parent_obj:
+            parent_obj = None
+            
+            # En sélection INDIVIDUELLE : utiliser l'objet actif 
+            if len(selected_projectors) == 1 and context.active_object and context.active_object != projector:
+                parent_obj = context.active_object
+                print(f"DEBUG: Using active object: {parent_obj.name}")
+            # En MULTI-sélection OU si pas d'objet actif valide : utiliser le parent de CHAQUE projecteur
+            elif projector.parent:
+                parent_obj = projector.parent
+                print(f"DEBUG: Using projector parent: {parent_obj.name}")
+            # En dernier recours, le projecteur lui-même
+            else:
                 parent_obj = projector
+                print(f"DEBUG: Using projector itself: {parent_obj.name}")
             
             # Vérifier si SCREEN_DISTANCE existe
             screen_distance = None

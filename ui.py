@@ -202,6 +202,42 @@ def get_light_button_text(context):
     else:
         return "Light"
 
+class PROJECTOR_OT_set_color(Operator):
+    """Set projector color to a specific value"""
+    bl_idname = 'projector.set_color'
+    bl_label = 'Set Projector Color'
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    color: bpy.props.FloatVectorProperty(
+        name="Color",
+        subtype='COLOR',
+        size=3,
+        min=0.0, max=1.0,
+        default=(1.0, 1.0, 1.0)
+    )
+    
+    @classmethod
+    def poll(cls, context):
+        selected_projectors = get_projectors(context, only_selected=True)
+        if not selected_projectors:
+            return False
+        # Vérifier qu'au moins un projecteur utilise checker texture
+        for projector in selected_projectors:
+            if projector.proj_settings.projected_texture == Textures.CHECKER.value:
+                return True
+        return False
+
+    def execute(self, context):
+        from .projector import update_checker_color
+        selected_projectors = get_projectors(context, only_selected=True)
+        
+        for projector in selected_projectors:
+            if projector.proj_settings.projected_texture == Textures.CHECKER.value:
+                projector.proj_settings.projected_color = self.color
+                update_checker_color(projector.proj_settings, context)
+        
+        return {'FINISHED'}
+
 class PROJECTOR_OT_export_csv(Operator):
     """Export projector data to CSV"""
     bl_idname = 'projector.export_csv'
@@ -387,6 +423,38 @@ class PROJECTOR_PT_projector_settings(Panel):
             # Bouton Export en dessous
             export_row = info_box.row()
             export_row.operator('projector.export_csv', text="Export CSV", icon='EXPORT')
+            
+            # Boutons de couleurs de projection
+            colors_box = info_box.box()
+            colors_box.label(text="Projection Colors:", icon='COLOR')
+            
+            # Première ligne : White, Red, Blue, Green
+            colors_row1 = colors_box.row(align=True)
+            
+            white_op = colors_row1.operator('projector.set_color', text="WHI")
+            white_op.color = (1.0, 1.0, 1.0)  # White
+            
+            red_op = colors_row1.operator('projector.set_color', text="RED")
+            red_op.color = (1.0, 0.0, 0.0)  # Red
+            
+            blue_op = colors_row1.operator('projector.set_color', text="BLU")
+            blue_op.color = (0.0, 0.0, 1.0)  # Blue
+            
+            green_op = colors_row1.operator('projector.set_color', text="GRE")
+            green_op.color = (0.0, 1.0, 0.0)  # Green
+    
+            
+            magenta_op = colors_row1.operator('projector.set_color', text="MAG")
+            magenta_op.color = (1.0, 0.0, 1.0)  # Magenta
+            
+            yellow_op = colors_row1.operator('projector.set_color', text="YEL")
+            yellow_op.color = (1.0, 1.0, 0.0)  # Yellow
+            
+            cyan_op = colors_row1.operator('projector.set_color', text="CYA")
+            cyan_op.color = (0.0, 1.0, 1.0)  # Cyan
+            
+            # Espace pour équilibrer
+            colors_row1.operator('projector.change_color', text="?", icon='QUESTION')
 
             # === PROPRIÉTÉS - SEULEMENT SI UN SEUL PROJECTEUR ===
             if len(selected_projectors) == 1:
@@ -433,6 +501,7 @@ class PROJECTOR_PT_projector_settings(Panel):
                 # Screen Auto-Sizing
                 layout.separator()
                 auto_box = layout.box()
+
                 auto_box.label(text="Projection infos")
                 auto_box.operator('projector.auto_adjust_screen_size', 
                                   text="Adjust Screen Size", 
@@ -526,6 +595,7 @@ def register():
     bpy.utils.register_class(PROJECTOR_PT_projector_settings)
     bpy.utils.register_class(PROJECTOR_PT_projected_color)
     bpy.utils.register_class(PROJECTOR_OT_export_csv)
+    bpy.utils.register_class(PROJECTOR_OT_set_color)
     # Register create  in the blender add menu.
     bpy.types.VIEW3D_MT_light_add.append(append_to_add_menu)
 
@@ -533,6 +603,7 @@ def register():
 def unregister():
     # Register create in the blender add menu.
     bpy.types.VIEW3D_MT_light_add.remove(append_to_add_menu)
+    bpy.utils.register_class(PROJECTOR_OT_set_color)
     bpy.utils.unregister_class(PROJECTOR_OT_export_csv)
     bpy.utils.unregister_class(PROJECTOR_PT_projected_color)
     bpy.utils.unregister_class(PROJECTOR_PT_projector_settings)
