@@ -921,11 +921,33 @@ class PROJECTOR_OT_delete_projector(Operator):
 
     def execute(self, context):
         selected_projectors = get_projectors(context, only_selected=True)
+        deleted_count = 0
+        
         for projector in selected_projectors:
-            for child in projector.children:
-                bpy.data.objects.remove(child, do_unlink=True)
+            # Identifier l'objet parent à supprimer
+            if context.active_object and context.active_object != projector:
+                parent_to_delete = context.active_object
+            elif projector.parent:
+                parent_to_delete = projector.parent
             else:
-                bpy.data.objects.remove(projector, do_unlink=True)
+                parent_to_delete = projector
+            
+            # Fonction récursive pour supprimer tous les enfants
+            def delete_hierarchy_recursive(obj):
+                """Supprime récursivement un objet et tous ses enfants"""
+                children_to_delete = list(obj.children)  # Copie pour éviter les modifications pendant l'itération
+                
+                for child in children_to_delete:
+                    delete_hierarchy_recursive(child)
+                
+                # Supprimer l'objet lui-même
+                bpy.data.objects.remove(obj, do_unlink=True)
+            
+            # Supprimer toute la hiérarchie à partir du parent
+            delete_hierarchy_recursive(parent_to_delete)
+            deleted_count += 1
+        
+        self.report({'INFO'}, f"Deleted {deleted_count} projector hierarchy(ies)")
         return {'FINISHED'}
 
 def update_lumens(proj_settings, context):
@@ -1057,8 +1079,8 @@ def register():
 
 
 def unregister():
-    
     bpy.utils.unregister_class(PROJECTOR_OT_change_color_randomly)
+    bpy.utils.unregister_class(PROJECTOR_OT_auto_adjust_screen_size)
     bpy.utils.unregister_class(PROJECTOR_OT_delete_projector)
     bpy.utils.unregister_class(PROJECTOR_OT_create_projector)
     bpy.utils.unregister_class(ProjectorSettings)

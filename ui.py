@@ -433,7 +433,7 @@ class PROJECTOR_OT_export_csv(Operator):
 
 class PROJECTOR_PT_projector_settings(Panel):
     bl_idname = 'OBJECT_PT_projector_n_panel'
-    bl_label = 'Proj By Lotchi 25.1.6'
+    bl_label = 'Proj By Lotchi 25.2.1'
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "Proj By Lotchi"
@@ -443,9 +443,20 @@ class PROJECTOR_PT_projector_settings(Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
 
+        # Boutons de base : New, Duplicate, Remove
         row = layout.row(align=True)
         row.operator('projector.create',
                      icon='ADD', text="New")
+        
+        # Bouton Dupliquer - seulement si exactement un projecteur est sélectionné
+        selected_projectors = get_projectors(context, only_selected=True)
+        if len(selected_projectors) == 1:
+            row.operator('projector.duplicate',
+                         icon='DUPLICATE', text="Duplicate")
+        # Dans la ligne des boutons, après Duplicate
+        if len(selected_projectors) == 1:
+            row.operator('projector.mirror', icon='MOD_MIRROR', text="Mirror")
+        
         row.operator('projector.delete',
                      text='Remove', icon='REMOVE')
 

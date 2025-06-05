@@ -13,8 +13,8 @@ Ce document liste toutes les fonctionnalités prévues pour les futures versions
 - [x] Export CSV des données
 - [x] Offset automatique de l'écran avec shift caméra
 - [x] Base de données de projecteurs
-- [ ] Fonction Mirror XZ, si c'est Portrait tel Mirror, si c'est Paysage tel Mirror
-- [ ] Bouton Dupliquer Mirror Renommer Delete
+- [x] Fonction Mirror XZ, si c'est Portrait tel Mirror, si c'est Paysage tel Mirror
+- [x] Bouton Dupliquer Mirror Renommer Delete
 
 ### ⭐⭐ Moyenne priorité  
 - [ ] Patterns de test simples (WHITE, BLUE, etc.)

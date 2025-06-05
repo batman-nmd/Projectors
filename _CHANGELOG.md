@@ -5,7 +5,7 @@ Toutes les modifications importantes de ce projet seront documentées dans ce fi
 Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et ce projet adhère au [Versioning Sémantique](https://semver.org/lang/fr/).
 
-## [2025.1.8] - 2025-06-04
+## [2025.2.1] - 2025-06-05
 
 ### Ajouté
 - **Sélection par objet parent** : Plus besoin de sélectionner directement la caméra projecteur
@@ -31,6 +31,9 @@ et ce projet adhère au [Versioning Sémantique](https://semver.org/lang/fr/).
 - [x] Option Paysage Dual disponible, si coché double ligne dans CSV, et visibilité d'un objet dont le nom contient "dual"
 - [x] Export CSV des données
 - [x] Offset automatique de l'écran avec shift caméra
+- [x] Base de données de projecteurs
+- [x] Fonction Mirror XZ, si c'est Portrait tel Mirror, si c'est Paysage tel Mirror
+- [x] Bouton Dupliquer Mirror Renommer Delete
 
 
 ### Modifié
