@@ -559,6 +559,7 @@ class PROJECTOR_PT_projector_settings(Panel):
                 # Lens Shift
                 col = box.column(align=True)
                 col.prop(proj_settings, 'h_shift', text='Horizontal Shift')
+                col.separator()
                 col.prop(proj_settings, 'v_shift', text='Vertical Shift')
 
                 # Petit espace
@@ -595,9 +596,26 @@ class PROJECTOR_PT_projector_settings(Panel):
                         # Affichage des informations avec espacement réduit
                         info_col = auto_box.column(align=True)  # align=True réduit l'espacement
                         info_col.scale_y = 0.8  # Facteur de réduction de l'espacement vertical
+                        # Récupérer les informations du projecteur
+                        brand = projector.get("SELECTED_BRAND", "")
+                        model = projector.get("SELECTED_MODEL", "")
+                        lens = projector.get("SELECTED_LENS", "")
+
+                        # Ligne avec Brand, Model, Lens et shifts min/max
+                        if brand and model and lens:
+                            # Récupérer les shifts min/max
+                            h_min = proj_settings.h_shift_min
+                            h_max = proj_settings.h_shift_max
+                            v_min = proj_settings.v_shift_min
+                            v_max = proj_settings.v_shift_max
+                            
+                            # Construire le texte de la lentille (version courte)
+                            lens_short = lens.split(' ')[0] if ' ' in lens else lens  # Prendre seulement le ratio
+                            
+                            info_col.label(text=f"{brand} {model} | {proj_settings.lumens:.0f} ANSI", icon='CAMERA_DATA')
                         
+                        info_col.label(text=f"Lens: {lens_short} | H:{h_min:.0f}/{h_max:.0f} V:{v_min:.0f}/{v_max:.0f}", icon='LIGHT_AREA')
                         info_col.label(text=f"Distance: {parent_obj['SCREEN_DISTANCE']:.1f}m, TR: {proj_settings.throw_ratio:.2f}", icon='INFO')
-                        info_col.label(text=f"Lumens: {proj_settings.lumens:.0f} ANSI", icon='LIGHT_AREA')
 
                         # Calcul du ratio d'image
                         res_w, res_h = proj_settings.resolution.split('x')

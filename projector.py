@@ -161,9 +161,17 @@ def update_projector_lens_local(proj_settings, context):
         
         lens_data = PROJECTOR_DATABASE[brand][model][lens]
         
-        # Mettre à jour SEULEMENT les lumens
+        # Mettre à jour les lumens
         proj_settings.lumens = lens_data['ansi_lumens']
         print(f"LOCAL DEBUG LENS: Lumens set to {lens_data['ansi_lumens']}")
+        
+        # NOUVEAU : Mettre à jour les limites de shift selon la lentille
+        proj_settings.v_shift_min = lens_data['v_shift_min'] * BARCO_SHIFT_COEFFICIENT
+        proj_settings.v_shift_max = lens_data['v_shift_max'] * BARCO_SHIFT_COEFFICIENT  
+        proj_settings.h_shift_min = lens_data['h_shift_min'] * BARCO_SHIFT_COEFFICIENT
+        proj_settings.h_shift_max = lens_data['h_shift_max'] * BARCO_SHIFT_COEFFICIENT
+        
+        print(f"LOCAL DEBUG LENS: Shift limits - H: {proj_settings.h_shift_min:.1f} to {proj_settings.h_shift_max:.1f}, V: {proj_settings.v_shift_min:.1f} to {proj_settings.v_shift_max:.1f}")
         
         # Sauvegarder dans custom properties
         projector = get_projector(bpy.context)
@@ -986,17 +994,42 @@ class ProjectorSettings(bpy.types.PropertyGroup):
         description="Use the resolution from the image as the projector resolution. Warning: After selecting a new image toggle this checkbox to update",
         update=update_throw_ratio)
     h_shift: bpy.props.FloatProperty(
-        name="Horizontal Shift",
-        description="Horizontal Lens Shift",
-        soft_min=-50, soft_max=50,
-        update=update_lens_shift,
-        subtype='PERCENTAGE')
+    name="Horizontal Shift",
+    description="Horizontal Lens Shift",
+    soft_min=-100, soft_max=100,  # Valeurs par défaut
+    update=update_lens_shift,
+    subtype='PERCENTAGE',
+    get=lambda self: self.get("h_shift", 0.0),
+    set=lambda self, value: self.__setitem__("h_shift", max(self.h_shift_min, min(self.h_shift_max, value))))
+
     v_shift: bpy.props.FloatProperty(
         name="Vertical Shift",
-        description="Vertical Lens Shift",
-        soft_min=-50, soft_max=50,
+        description="Vertical Lens Shift", 
+        soft_min=-100, soft_max=100,  # Valeurs par défaut
         update=update_lens_shift,
-        subtype='PERCENTAGE')
+        subtype='PERCENTAGE',
+        get=lambda self: self.get("v_shift", 0.0),
+        set=lambda self, value: self.__setitem__("v_shift", max(self.v_shift_min, min(self.v_shift_max, value))))
+    # AJOUTEZ CES 4 NOUVELLES PROPRIÉTÉS :
+    v_shift_min: bpy.props.FloatProperty(
+        name="Vertical Shift Min",
+        description="Minimum vertical lens shift",
+        default=-50.0)
+    
+    v_shift_max: bpy.props.FloatProperty(
+        name="Vertical Shift Max", 
+        description="Maximum vertical lens shift",
+        default=50.0)
+    
+    h_shift_min: bpy.props.FloatProperty(
+        name="Horizontal Shift Min",
+        description="Minimum horizontal lens shift", 
+        default=-50.0)
+    
+    h_shift_max: bpy.props.FloatProperty(
+        name="Horizontal Shift Max",
+        description="Maximum horizontal lens shift",
+        default=50.0)
     projected_color: bpy.props.FloatVectorProperty(
         subtype='COLOR',
         update=update_checker_color)
