@@ -4,6 +4,10 @@ from .projector import RESOLUTIONS, Textures, calculate_screen_size, calculate_l
 import bpy, math
 from bpy.types import Panel, PropertyGroup, UIList, Operator
 
+def get_custom_icons():
+    from . import custom_icons
+    return custom_icons
+
 class PROJECTOR_OT_focus_selected(Operator):
     """Focus the 3D view on selected object (same as View Selected)"""
     bl_idname = 'projector.focus_selected'
@@ -442,6 +446,14 @@ class PROJECTOR_PT_projector_settings(Panel):
         layout = self.layout
         layout.use_property_split = True
         layout.use_property_decorate = False
+        
+        # Afficher le logo en haut
+        custom_icons = get_custom_icons()
+        if custom_icons and "logo" in custom_icons:
+            row = layout.row()
+            row.alignment = 'CENTER'
+            row.template_icon(icon_value=custom_icons["logo"].icon_id, scale=3.0)
+            #layout.separator()
 
         # Boutons de base : New, Duplicate, Remove
         row = layout.row(align=True)
